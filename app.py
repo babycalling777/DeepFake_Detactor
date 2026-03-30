@@ -30,14 +30,15 @@ def load_tools():
 
     model = timm.create_model('legacy_xception', pretrained=False, num_classes=2).to(device)
 
-    # ✅ FINAL FIX (NO D DRIVE)
+    # ✅ LOCAL MODEL (REPO SE LOAD)
     model_path = "deepfake_detector_smart_v2.pth"
 
     if os.path.exists(model_path):
-        model.load_state_dict(torch.load(model_path, map_location=device))
+        # 🔥 FINAL FIX (IMPORTANT)
+        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=False))
         model.eval()
     else:
-        st.error("❌ Model file nahi mili! Ensure repo me .pth file hai")
+        st.error("❌ Model file nahi mili! Repo me .pth file upload karo")
 
     return mtcnn, model, device
 
@@ -63,7 +64,7 @@ if file:
         st.video(file)
 
     if st.button('🚀 Start Full Video Scan'):
-        with st.spinner('AI वीडियो के 20 अलग-अलग फ्रेम्स को स्कैन कर रहा है...'):
+        with st.spinner('AI वीडियो के 20 फ्रेम्स को स्कैन कर रहा है...'):
 
             cap = cv2.VideoCapture(tfile.name)
             v_len = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -74,7 +75,7 @@ if file:
             transform = transforms.Compose([
                 transforms.Resize((299, 299)),
                 transforms.ToTensor(),
-                transforms.Normalize([0.5] * 3, [0.5] * 3)
+                transforms.Normalize([0.5]*3, [0.5]*3)
             ])
 
             for idx in frames:
@@ -113,15 +114,15 @@ if file:
 
                 with col2:
                     if conf < 60:
-                        st.warning(f"AI is Uncertain (Confidence: {conf:.2f}%)")
+                        st.warning(f"AI is Uncertain ({conf:.2f}%)")
                     elif final_res == "FAKE":
                         st.error(f"🚨 RESULT: {final_res}")
                     else:
                         st.success(f"✅ RESULT: {final_res}")
 
-                    st.metric("Overall Confidence", f"{conf:.2f}%")
+                    st.metric("Confidence", f"{conf:.2f}%")
             else:
-                st.warning("Video में कोई चेहरा नहीं मिला!")
+                st.warning("कोई चेहरा नहीं मिला!")
 
     try:
         os.unlink(tfile.name)
