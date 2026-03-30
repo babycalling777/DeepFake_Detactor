@@ -1,0 +1,9 @@
+streamlit==1.55.0
+torch
+torchvision
+opencv-python-headless
+numpy
+pillow
+facenet-pytorch
+timm
+requests
