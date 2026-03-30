@@ -8,13 +8,33 @@ from facenet_pytorch import MTCNN
 import timm
 import tempfile
 import os
+import requests
 
 # --- UI Setup ---
 st.set_page_config(page_title="Deepfake Detector Pro AI", page_icon="🛡️")
-st.title("🛡️ Pro Deepfake Detector (CPU Mode)")
-st.info("यह AI CPU पर चलेगा और वीडियो को स्कैन करेगा।")
+st.title("🛡️ Pro Deepfake Detector (CPU + Online Model)")
+st.info("यह AI CPU पर चलेगा और मॉडल Google Drive से डाउनलोड होगा।")
 
-# --- Model & Tools Loading ---
+# --- Model Download ---
+@st.cache_resource
+def download_model():
+    model_path = "deepfake_detector_smart_v2.pth"
+
+    if not os.path.exists(model_path):
+        st.info("⬇️ Downloading model from Google Drive...")
+
+        file_id = "1VIgN44gUu8VqdkjG18EbHhRnAKc8xOwM"
+        url = f"https://drive.google.com/uc?export=download&id={file_id}"
+
+        response = requests.get(url)
+
+        with open(model_path, "wb") as f:
+            f.write(response.content)
+
+    return model_path
+
+
+# --- Load Tools ---
 @st.cache_resource
 def load_tools():
     device = torch.device('cpu')
@@ -30,27 +50,24 @@ def load_tools():
 
     model = timm.create_model('legacy_xception', pretrained=False, num_classes=2).to(device)
 
-    # ✅ LOCAL MODEL (REPO SE LOAD)
-    model_path = "deepfake_detector_smart_v2.pth"
+    model_path = download_model()
 
-    if os.path.exists(model_path):
-        # 🔥 FINAL FIX (IMPORTANT)
-        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=False))
-        model.eval()
-    else:
-        st.error("❌ Model file nahi mili! Repo me .pth file upload karo")
+    # 🔥 IMPORTANT FIX (PyTorch error fix)
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=False))
+    model.eval()
 
     return mtcnn, model, device
 
 
-# Load tools
+# Load
 try:
     mtcnn, model, device = load_tools()
-    st.sidebar.success("Model Loaded on CPU ✔")
+    st.sidebar.success("Model Loaded Successfully ✔")
 except Exception as e:
     st.error(f"Error loading AI tools: {e}")
 
-# --- Video Upload Section ---
+
+# --- Upload ---
 file = st.file_uploader("Video File Chunein...", type=["mp4", "avi", "mov"])
 
 if file:
@@ -64,7 +81,7 @@ if file:
         st.video(file)
 
     if st.button('🚀 Start Full Video Scan'):
-        with st.spinner('AI वीडियो के 20 फ्रेम्स को स्कैन कर रहा है...'):
+        with st.spinner('AI वीडियो के फ्रेम्स स्कैन कर रहा है...'):
 
             cap = cv2.VideoCapture(tfile.name)
             v_len = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -100,7 +117,7 @@ if file:
                             prob = torch.softmax(out, dim=1).cpu().numpy()
                             all_probs.append(prob)
 
-                except Exception:
+                except:
                     continue
 
             cap.release()
@@ -114,15 +131,15 @@ if file:
 
                 with col2:
                     if conf < 60:
-                        st.warning(f"AI is Uncertain ({conf:.2f}%)")
+                        st.warning(f"AI Uncertain ({conf:.2f}%)")
                     elif final_res == "FAKE":
-                        st.error(f"🚨 RESULT: {final_res}")
+                        st.error(f"🚨 FAKE ({conf:.2f}%)")
                     else:
-                        st.success(f"✅ RESULT: {final_res}")
+                        st.success(f"✅ REAL ({conf:.2f}%)")
 
                     st.metric("Confidence", f"{conf:.2f}%")
             else:
-                st.warning("कोई चेहरा नहीं मिला!")
+                st.warning("कोई face detect नहीं हुआ")
 
     try:
         os.unlink(tfile.name)
